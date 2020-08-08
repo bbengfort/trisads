@@ -1,0 +1,42 @@
+syntax = "proto3";
+package proto;
+
+import "models.proto";
+
+
+service TRISADirectory {
+    rpc Register(RegisterRequest) returns (RegisterReply) {}
+    rpc Lookup(LookupRequest) returns (LookupReply) {}
+    rpc Search(SearchRequest) returns (SearchReply) {}
+}
+
+
+message Error {
+    int32 code = 1;
+    string message = 2;
+}
+
+message RegisterRequest {}
+
+message RegisterReply {
+    Error error = 1;
+}
+
+message LookupRequest {
+    uint32 id = 1;
+}
+
+message LookupReply {
+    Error error = 1;
+    VASP vasp = 2;
+}
+
+message SearchRequest {
+    string query = 1;
+}
+
+message SearchReply {
+    Error error = 1;
+    repeated VASP vasps = 2;
+}
+
