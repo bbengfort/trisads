@@ -1,8 +1,8 @@
 syntax = "proto3";
-package proto;
+package pb;
 
 message VASP {
-    uint32 id = 1;
+    uint64 id = 1;
     Entity vaspEntity = 2;
     TRISACertification vaspTRISACertification = 3;
     string firstListed = 4;
@@ -10,16 +10,20 @@ message VASP {
 }
 
 message Entity {
-    uint32 id = 1;
+    uint64 id = 1;
     string vaspFullLegalName = 2;
     string vaspFullLegalAddress = 3;
     string vaspIncorporationDate = 4;
     string vaspIncorporationNumber = 5;
     string vaspLEINumber = 6;
+    string vaspContactEmail = 7;
+    string vaspURL = 8;
+    string vaspCategory = 9;
+    string vaspCountry = 10;
 }
 
 message TRISACertification {
-    uint32 id = 1;
+    uint64 id = 1;
     Name subjectName = 2;
     Name issuerName = 3;
     bytes serialNumber = 4;
@@ -33,7 +37,7 @@ message TRISACertification {
 }
 
 message Name {
-    uint32 id = 1;
+    uint64 id = 1;
     string commonName = 2;
     string countryRegion = 3;
     string organization = 4;
@@ -47,7 +51,7 @@ message Name {
 }
 
 message PublicKeyInfo {
-    uint32 id = 1;
+    uint64 id = 1;
     string algorithm = 2;
     repeated string parameters = 3;
     bytes publicKey = 4;
