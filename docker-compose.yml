@@ -1,0 +1,8 @@
+version: '2.0'
+services:
+  trisads:
+    image: "trisacrypto/trisads:develop"
+    ports:
+      - 4433:4433
+    volumes:
+      - ./fixtures/db:/data
