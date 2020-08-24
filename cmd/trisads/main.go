@@ -1,16 +1,20 @@
 package main
 
 import (
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"time"
 
 	"github.com/bbengfort/trisads"
 	"github.com/bbengfort/trisads/pb"
 	"github.com/bbengfort/trisads/store"
 	"github.com/urfave/cli"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -22,9 +26,10 @@ func main() {
 	app.Flags = []cli.Flag{}
 	app.Commands = []cli.Command{
 		{
-			Name:   "serve",
-			Usage:  "run the trisa directory service",
-			Action: serve,
+			Name:     "serve",
+			Usage:    "run the trisa directory service",
+			Category: "server",
+			Action:   serve,
 			Flags: []cli.Flag{
 				cli.StringFlag{
 					Name:  "a, addr",
@@ -33,7 +38,7 @@ func main() {
 				},
 				cli.StringFlag{
 					Name:   "d, db",
-					Usage:  "path to LevelDB directory storage",
+					Usage:  "dsn to connect to trisa directory storage",
 					EnvVar: "TRISADS_DATABASE",
 				},
 			},
@@ -41,6 +46,7 @@ func main() {
 		{
 			Name:      "load",
 			Usage:     "load the directory from a csv file",
+			Category:  "server",
 			Action:    load,
 			ArgsUsage: "csv [csv ...]",
 			Flags: []cli.Flag{
@@ -51,28 +57,130 @@ func main() {
 				},
 			},
 		},
+		{
+			Name:     "verify",
+			Usage:    "mark a VASP entity as verified and create certificates",
+			Category: "server",
+			Action:   verify,
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:   "d, db",
+					Usage:  "dsn to connect to trisa directory storage",
+					EnvVar: "TRISADS_DATABASE",
+				},
+				cli.BoolFlag{
+					Name:  "l, list",
+					Usage: "list VASPs that require verification and exit",
+				},
+				cli.Uint64Flag{
+					Name:  "v, vasp",
+					Usage: "the ID of the VASP to mark as verified",
+				},
+			},
+		},
+		{
+			Name:     "register",
+			Usage:    "register a VASP using json data",
+			Category: "client",
+			Action:   register,
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:   "a, addr",
+					Usage:  "the address and port to connect to the directory service",
+					Value:  "localhost:4433",
+					EnvVar: "TRISA_DIRECTORY_URL",
+				},
+				cli.StringFlag{
+					Name:  "d, data",
+					Usage: "the json file containing the VASP data record",
+				},
+				cli.BoolFlag{
+					Name:  "V, no-verify",
+					Usage: "mark the request as no verification required",
+				},
+			},
+		},
+		{
+			Name:     "lookup",
+			Usage:    "lookup VASPs using name or ID",
+			Category: "client",
+			Action:   lookup,
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:   "a, addr",
+					Usage:  "the address and port to connect to the directory service",
+					Value:  "localhost:4433",
+					EnvVar: "TRISA_DIRECTORY_URL",
+				},
+				cli.StringFlag{
+					Name:  "n, name",
+					Usage: "name of the VASP to lookup (case-insensitive, exact match)",
+				},
+				cli.Uint64Flag{
+					Name:  "i, id",
+					Usage: "id of the VASP to lookup",
+				},
+			},
+		},
+		{
+			Name:     "search",
+			Usage:    "search for VASPs using name or country",
+			Category: "client",
+			Action:   search,
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:   "a, addr",
+					Usage:  "the address and port to connect to the directory service",
+					Value:  "localhost:4433",
+					EnvVar: "TRISA_DIRECTORY_URL",
+				},
+				cli.StringSliceFlag{
+					Name:  "n, name",
+					Usage: "one or more names of the VASPs to search for",
+				},
+				cli.StringSliceFlag{
+					Name:  "c, country",
+					Usage: "one or more countries of the VASPs to search for",
+				},
+			},
+		},
 	}
 
 	app.Run(os.Args)
 }
 
+// Serve the TRISA directory service
 func serve(c *cli.Context) (err error) {
+	var dsn string
+	if dsn = c.String("db"); dsn == "" {
+		return cli.NewExitError("please specify a dsn to connect to the directory store", 1)
+	}
+
+	var srv *trisads.Server
+	if srv, err = trisads.New(dsn); err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	if err = srv.Serve(c.String("addr")); err != nil {
+		return cli.NewExitError(err, 1)
+	}
 	return nil
 }
 
-// Quick helper function to load the LevelDB database with initial directory info.
+// Load the LevelDB database with initial directory info from CSV
+// TODO: remove or make more robust
 func load(c *cli.Context) (err error) {
 	if c.NArg() == 0 {
 		return cli.NewExitError("specify path to csv data to load", 1)
 	}
 
-	var dbpath string
-	if dbpath = c.String("db"); dbpath == "" {
-		return cli.NewExitError("please specify path to LevelDB storage", 1)
+	var dsn string
+	if dsn = c.String("db"); dsn == "" {
+		return cli.NewExitError("please specify a dsn to connect to the directory store", 1)
 	}
 
 	var db store.Store
-	if db, err = store.Open(dbpath); err != nil {
+	if db, err = store.Open(dsn); err != nil {
 		return cli.NewExitError(err, 1)
 	}
 	defer db.Close()
@@ -130,5 +238,130 @@ func load(c *cli.Context) (err error) {
 		}
 	}
 
+	return nil
+}
+
+// Verify a registered entity and assign keys (server-side CLI)
+func verify(c *cli.Context) (err error) {
+	return cli.NewExitError("not implemented", 7)
+}
+
+// Register an entity using the API from a CLI client
+func register(c *cli.Context) (err error) {
+	req := &pb.RegisterRequest{
+		Verify: !c.Bool("no-verify"),
+	}
+
+	var path string
+	if path = c.String("data"); path == "" {
+		return cli.NewExitError("specify a json file to load the entity data from", 1)
+	}
+
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	if err = json.Unmarshal(data, &req.Entity); err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	client, err := makeClient(c)
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	rep, err := client.Register(ctx, req)
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	return printJSON(rep)
+}
+
+// Lookup VASPs using the API from a CLI client
+func lookup(c *cli.Context) (err error) {
+	name := c.String("name")
+	id := c.Uint64("id")
+
+	if name == "" && id == 0 {
+		return cli.NewExitError("specify either name or id for lookup", 1)
+	}
+
+	if name != "" && id > 0 {
+		return cli.NewExitError("specify either name or id for lookup, not both", 1)
+	}
+
+	client, err := makeClient(c)
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	req := &pb.LookupRequest{
+		Name: name,
+		Id:   id,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	rep, err := client.Lookup(ctx, req)
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	return printJSON(rep)
+}
+
+// Search for VASPs by name or country using the API from a CLI client
+func search(c *cli.Context) (err error) {
+	req := &pb.SearchRequest{
+		Name:    c.StringSlice("name"),
+		Country: c.StringSlice("country"),
+	}
+
+	if len(req.Name) == 0 && len(req.Country) == 0 {
+		return cli.NewExitError("specify search query", 1)
+	}
+
+	client, err := makeClient(c)
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	rep, err := client.Search(ctx, req)
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	return printJSON(rep)
+}
+
+// helper function to create the GRPC client with default options
+func makeClient(c *cli.Context) (_ pb.TRISADirectoryClient, err error) {
+	var opts []grpc.DialOption
+	opts = append(opts, grpc.WithInsecure())
+
+	var cc *grpc.ClientConn
+	if cc, err = grpc.Dial(c.String("addr"), opts...); err != nil {
+		return nil, err
+	}
+	return pb.NewTRISADirectoryClient(cc), nil
+}
+
+// helper function to print JSON response and exit
+func printJSON(v interface{}) error {
+	data, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	fmt.Println(string(data))
 	return nil
 }

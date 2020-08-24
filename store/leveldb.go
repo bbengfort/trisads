@@ -13,6 +13,7 @@ import (
 
 	"github.com/bbengfort/trisads/pb"
 	"github.com/gogo/protobuf/proto"
+	log "github.com/sirupsen/logrus"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -219,6 +220,7 @@ func (s *ldbStore) Search(query map[string]interface{}) (vasps []pb.VASP, err er
 	// Lookup by name
 	names, ok := parseQuery("name", query)
 	if ok {
+		log.WithField("name", names).Debug("search name query")
 		for _, name := range names {
 			if id := s.names[name]; id > 0 {
 				records[id] = struct{}{}
@@ -330,14 +332,19 @@ func (s *ldbStore) sync() (err error) {
 
 // sync the autoincrement sequence with the leveldb auto sequence key
 func (s *ldbStore) seqsync() (err error) {
+	var pk uint64
 	val, err := s.db.Get(keyAutoSequence, nil)
-	if err != nil && err != leveldb.ErrNotFound {
-		return err
-	}
-
-	pk, n := binary.Uvarint(val)
-	if n <= 0 {
-		return ErrCorruptedSequence
+	if err != nil {
+		// If the auto sequence key is not found, simply leave pk to 0
+		if err != leveldb.ErrNotFound {
+			return err
+		}
+	} else {
+		var n int
+		if pk, n = binary.Uvarint(val); n <= 0 {
+			log.WithField("n", n).Error("could not parse primary key sequence value")
+			return ErrCorruptedSequence
+		}
 	}
 
 	// Critical section (optimizing for safety rather than speed)
@@ -354,6 +361,7 @@ func (s *ldbStore) seqsync() (err error) {
 	buf := make([]byte, binary.MaxVarintLen64)
 	binary.PutUvarint(buf, s.sequence)
 	if err = s.db.Put(keyAutoSequence, buf, nil); err != nil {
+		log.WithError(err).Error("could not put primary key sequence value")
 		return ErrCorruptedSequence
 	}
 
@@ -378,6 +386,7 @@ func (s *ldbStore) syncnames() (err error) {
 		}
 
 		if err = json.Unmarshal(val, &s.names); err != nil {
+			log.WithError(err).Error("could not unmarshal names index")
 			return ErrCorruptedIndex
 		}
 
@@ -386,10 +395,12 @@ func (s *ldbStore) syncnames() (err error) {
 	// Put the current names back to the database
 	val, err := json.Marshal(s.names)
 	if err != nil {
+		log.WithError(err).Error("could not marshal names index")
 		return ErrCorruptedIndex
 	}
 
 	if err = s.db.Put(keyNameIndex, val, nil); err != nil {
+		log.WithError(err).Error("could not put names index")
 		return ErrCorruptedIndex
 	}
 	return nil
@@ -413,6 +424,7 @@ func (s *ldbStore) synccountries() (err error) {
 		}
 
 		if err = json.Unmarshal(val, &s.countries); err != nil {
+			log.WithError(err).Error("could not unmarshall country index")
 			return ErrCorruptedIndex
 		}
 	}
@@ -420,10 +432,12 @@ func (s *ldbStore) synccountries() (err error) {
 	// Put the current countries back to the database
 	val, err := json.Marshal(s.countries)
 	if err != nil {
+		log.WithError(err).Error("could not marshal country index")
 		return ErrCorruptedIndex
 	}
 
 	if err = s.db.Put(keyCountryIndex, val, nil); err != nil {
+		log.WithError(err).Error("could not put country index")
 		return ErrCorruptedIndex
 	}
 
