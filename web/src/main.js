@@ -7,6 +7,7 @@ var views = {}
 views.alert = require('./views/alert.mustache');
 views.lookupResult = require('./views/lookupResult.mustache');
 views.searchResults = require('./views/searchResults.mustache');
+views.otherJurisdiction = require('./views/otherJurisdiction.mustache');
 
 (function ($) {
   $.fn.serializeForm = function() {
@@ -62,6 +63,12 @@ $(document).ready(function() {
     }
 
     client.search(req, {}, (err, response) => {
+      if (err || !response) {
+        console.log(err);
+        alert("danger", "connection error:", "no response from directory service");
+        return
+      }
+
       var err = response.getError();
       if (err) {
         alert("warning", "search error:", err.getMessage());
@@ -105,6 +112,12 @@ $(document).ready(function() {
     }
 
     client.lookup(req, {}, (err, response) => {
+      if (err || !response) {
+        console.log(err);
+        alert("danger", "connection error:", "no response from directory service");
+        return
+      }
+
       var err = response.getError();
       if (err) {
         alert("warning", "could not lookup VASP:", err.getMessage());
@@ -145,5 +158,38 @@ $(document).ready(function() {
 
     return false
   });
+
+  // Bind the register form to the register action
+  $("#registerForm").submit((e) => {
+    e.preventDefault();
+    if (e.target.checkValidity() === false) {
+      event.stopPropagation();
+      e.target.classList.add('was-validated');
+      return false
+    }
+
+    var data = $(e.target).serializeForm();
+    console.log(data);
+    alert("danger", "not yet implemented:", "currently this is only an example form");
+    return false
+  });
+
+  // Add another jurisdiction to the register form
+  $("#addOtherJurisdiction").click((e) => {
+    $("#otherJurisdictions").append(views.otherJurisdiction());
+  })
+
+  // Only allow KYC threshold to be available if yes on question 3b.
+  $('input[name="conductsCDD"').change((e) => {
+    var ans = $(e.target).val();
+    $("#kycThreshold").prop("disabled", ans=="no");
+  });
+
+  // Only allow Applicable Regulations to be available if yes on question 3d.
+  $('input[name="mustComplyTravelRule"').change((e) => {
+    var ans = $(e.target).val();
+    $("#travelRuleRegulations").prop("disabled", ans == "no");
+  });
+
 });
 
