@@ -6,3 +6,7 @@ services:
       - 4433:4433
     volumes:
       - ./fixtures/db:/data
+  envoy:
+    image: "trisacrypto/proxy:develop"
+    ports:
+      - 8080:8080

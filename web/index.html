@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="">
+  <meta name="author" content="">
+  <link rel="icon" href="img/favicon.png">
+
+  <title>TRISA Directory Service</title>
+
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-light">
+
+  <div class="container">
+    <!-- header -->
+    <div class="pt-5 pb-3 text-center">
+      <div id="alerts"></div>
+      <img class="d-block mx-auto mb-4" src="img/trisa.png" alt="" width="72" height="72">
+      <h2>TRISA Directory Service</h2>
+      <p class="lead">Lookup Virtual Asset Service Providers that are TRISA certified.</p>
+    </div>
+
+    <!-- navigation -->
+    <ul class="nav nav-tabs justify-content-center" id="directoryServiceTabs">
+      <li class="nav-item" role="presentation">
+        <a class="nav-link active" id="search-tab" data-toggle="tab" href="#search" role="tab" aria-controls="search" aria-selected="true">Search</a>
+      </li>
+      <li class="nav-item" role="presentation">
+        <a class="nav-link" id="lookup-tab" data-toggle="tab" href="#lookup" role="tab" aria-controls="lookup" aria-selected="false">Lookup</a>
+      </li>
+      <li class="nav-item" role="presentation">
+        <a class="nav-link" id="register-tab" data-toggle="tab" href="#register" role="tab" aria-controls="register" aria-selected="false">Register</a>
+      </li>
+    </ul>
+
+    <!-- tab panels -->
+    <div class="tab-content" id="directoryServiceTabContent">
+      <!-- search panel -->
+      <div class="tab-pane fade show active" id="search" role="tabpanel" aria-labelledby="search-tab">
+        <div class="py-3 text-center">
+          <p class="text-muted">Search for VASPs by Name and Country</p>
+        </div>
+
+        <form id="searchForm" class="form-inline col-md-8 offset-md-2">
+          <label class="sr-only" for="name">Name Query</label>
+          <input type="text" class="form-control mb-1 mr-sm-2 col-md-5" id="name" name="name" placeholder="Name(s)">
+          <label class="sr-only" for="country">Country Query</label>
+          <input type="text" class="form-control mb-1 mr-sm-2 col-md-5" id="country" name="country" placeholder="Countries(s)">
+          <button type="submit" name="submit" class="btn btn-primary mb-1">Submit</button>
+        </form>
+        <div class="col-md-8 offset-md-2">
+          <small class="help-text text-muted">Separate multiple terms with a comma.</small>
+        </div>
+
+        <div id="searchResults"></div>
+      </div>
+
+      <!-- lookup panel -->
+      <div class="tab-pane fade" id="lookup" role="tabpanel" aria-labelledby="lookup-tab">
+        <div class="py-3 text-center">
+          <p class="text-muted">Lookup a VASP Registration by Name or ID</p>
+        </div>
+
+        <form id="lookupForm" class="form-inline col-md-8 offset-md-2">
+          <label class="sr-only" for="query">Lookup Query</label>
+          <input type="text" class="form-control mb-1 mr-sm-2 col-md-8" id="query" name="query" placeholder="Name or ID">
+          <div class="form-check mb-2 mr-sm-2">
+            <input class="form-check-input" type="checkbox" id="lookupByID" name="lookupByID">
+            <label class="form-check-label" for="lookupByID">ID</label>
+          </div>
+          <button type="submit" name="submit" class="btn btn-primary mb-1">Submit</button>
+        </form>
+
+        <div id="lookupResults"></div>
+      </div>
+
+      <!-- register panel -->
+      <div class="tab-pane fade" id="register" role="tabpanel" aria-labelledby="register-tab">
+        <div class="py-3 text-center">
+          <p class="text-muted">Register your VASP with TRISA</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
+  <script src="build/bundle.js"></script>
+</body>
+</html>
