@@ -153,10 +153,12 @@ func (s *Server) Search(ctx context.Context, in *pb.SearchRequest) (out *pb.Sear
 	}
 
 	out.Vasps = make([]*pb.VASP, len(vasps))
-	for i, vasp := range vasps {
+	for i := 0; i < len(vasps); i++ {
+		// avoid pointer errors from range
+		out.Vasps[i] = &vasps[i]
+
 		// return only entities, remove certificate info until lookup
-		vasp.VaspTRISACertification = nil
-		out.Vasps[i] = &vasp
+		out.Vasps[i].VaspTRISACertification = nil
 	}
 
 	entry := log.WithFields(log.Fields{
