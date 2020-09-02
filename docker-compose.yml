@@ -1,12 +1,19 @@
 version: '2.0'
 services:
   trisads:
+    build: "."
     image: "trisacrypto/trisads:develop"
     ports:
       - 4433:4433
     volumes:
       - ./fixtures/db:/data
   envoy:
+    build: "./proxy"
     image: "trisacrypto/proxy:develop"
     ports:
       - 8080:8080
+  dsui:
+    build: "./web"
+    image: "trisacrypto/dsui:develop"
+    ports:
+      - 8000:80
