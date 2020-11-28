@@ -56,7 +56,7 @@ func main() {
 				},
 				cli.StringFlag{
 					Name:  "o, organization",
-					Usage: "name of organization to issue certificats for",
+					Usage: "name of organization to issue certificates for",
 				},
 				cli.StringFlag{
 					Name:  "C, country",
