@@ -3,9 +3,12 @@ module github.com/bbengfort/trisads
 go 1.14
 
 require (
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.4.2
+	github.com/shibukawa/configdir v0.0.0-20170330084843-e180dbdc8da0
 	github.com/sirupsen/logrus v1.6.0
+	github.com/stretchr/testify v1.2.2
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/urfave/cli v1.22.4
 	golang.org/x/net v0.0.0-20200707034311-ab3426394381
@@ -14,4 +17,5 @@ require (
 	google.golang.org/genproto v0.0.0-20200806141610-86f49bd18e98 // indirect
 	google.golang.org/grpc v1.31.0
 	google.golang.org/protobuf v1.25.0 // indirect
+	gopkg.in/yaml.v2 v2.2.2
 )
