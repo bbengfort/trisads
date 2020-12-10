@@ -16,3 +16,6 @@
 
 # Data files
 fixtures/*
+
+# Environment configuration
+.env
