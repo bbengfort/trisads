@@ -1,5 +1,10 @@
 package sectigo
 
+import (
+	"fmt"
+	"strings"
+)
+
 // AuthenticationRequest to POST data to the authenticateEP
 type AuthenticationRequest struct {
 	Username string `json:"username"`
@@ -107,6 +112,59 @@ type FindCertificateResponse struct {
 		CreationDate string `json:"creationDate"`
 		Status       string `json:"status"`
 	} `json:"items"`
+}
+
+// CRLReason specifies the RFC 5280 certificate revocation reason codes.
+type CRLReason int
+
+func (c CRLReason) String() string {
+	if c < 0 || c == 7 || c > 10 {
+		return "invalid CRL reason code"
+	}
+
+	return []string{
+		"unspecified", "key compromise", "ca compromise", "affiliation changed",
+		"superseded", "cessation of operation", "certificate hold",
+		"value 7 is not used",
+		"remove from crl", "privilege withdrawn", "aa compromise",
+	}[c]
+}
+
+// CRL reason codes for RFC 5280 certifcate revokation.
+const (
+	CRLRUnspecified          CRLReason = 0
+	CRLRKeyCompromise        CRLReason = 1
+	CRLRCACompromise         CRLReason = 2
+	CRLRAffiliationChanged   CRLReason = 3
+	CRLRSuperseded           CRLReason = 4
+	CRLRCessationOfOperation CRLReason = 5
+	CRLRCertificateHold      CRLReason = 6
+	CRLRRemoveFromCRL        CRLReason = 8
+	CRLRPrivilegeWithdrawn   CRLReason = 9
+	CRLRAACompromise         CRLReason = 10
+)
+
+// RevokeReasonCode translates a human readable string to a RFC 5280 reason code.
+func RevokeReasonCode(reason string) (code CRLReason, err error) {
+	if reason == "" {
+		return CRLRUnspecified, nil
+	}
+
+	names := []string{
+		"unspecified", "keycompromise", "cacompromise", "affiliationchanged",
+		"superseded", "cessationofoperation", "certificatehold",
+		"value7isnotused",
+		"removefromcrl", "privilegewithdrawn", "aacompromise",
+	}
+
+	reason = strings.ToLower(strings.ReplaceAll(reason, " ", ""))
+	for i, name := range names {
+		if reason == name {
+			return CRLReason(i), nil
+		}
+	}
+
+	return CRLReason(-1), fmt.Errorf("could not translate %q into a reason code", reason)
 }
 
 // RevokeCertificateRequest to POST to the revokeCertificateEP

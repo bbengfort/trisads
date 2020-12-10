@@ -12,6 +12,7 @@ func init() {
 const (
 	contentType         = "application/json;charset=UTF-8"
 	downloadContentType = "application/octet-stream"
+	userAgent           = "TRISADS Sectigo Client v1.0"
 )
 
 // baseURL is used to construct API endpoints for Sectigo methods.

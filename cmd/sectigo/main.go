@@ -132,6 +132,40 @@ func main() {
 				},
 			},
 		},
+		{
+			Name:   "find",
+			Usage:  "search for certs by common name and serial number",
+			Action: findCert,
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "n, common-name",
+					Usage: "search by common name",
+				},
+				cli.StringFlag{
+					Name:  "s, serial-number",
+					Usage: "search by serial number",
+				},
+			},
+		},
+		{
+			Name:   "revoke",
+			Usage:  "revoke a certificate by serial number",
+			Action: revokeCert,
+			Flags: []cli.Flag{
+				cli.IntFlag{
+					Name:  "p, profile",
+					Usage: "profile/authority id of the cert issuer",
+				},
+				cli.StringFlag{
+					Name:  "r, reason",
+					Usage: "RFC 5280 reason text",
+				},
+				cli.StringFlag{
+					Name:  "s, serial-number",
+					Usage: "serial number of the cert to revoke",
+				},
+			},
+		},
 	}
 
 	app.Run(os.Args)
@@ -321,6 +355,38 @@ func profiles(c *cli.Context) (err error) {
 	}
 
 	printJSON(rep)
+	return nil
+}
+
+func findCert(c *cli.Context) (err error) {
+	var rep *sectigo.FindCertificateResponse
+	if rep, err = api.FindCertificate(c.String("common-name"), c.String("serial-number")); err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	printJSON(rep)
+	return nil
+}
+
+func revokeCert(c *cli.Context) (err error) {
+	pid := c.Int("profile")
+	if pid == 0 {
+		return cli.NewExitError("must specify profile id", 1)
+	}
+
+	var reasonCode sectigo.CRLReason
+	if reasonCode, err = sectigo.RevokeReasonCode(c.String("reason")); err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	sn := c.String("serial-number")
+	if sn == "" {
+		return cli.NewExitError("must specify serial number of certificate", 1)
+	}
+
+	if err = api.RevokeCertificate(pid, int(reasonCode), sn); err != nil {
+		return cli.NewExitError(err, 1)
+	}
 	return nil
 }
 

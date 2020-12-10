@@ -118,7 +118,7 @@ func (s *Sectigo) Refresh() (err error) {
 	}
 
 	body := new(bytes.Buffer)
-	fmt.Fprintf(body, "%s\n", s.creds.RefreshToken)
+	fmt.Fprintf(body, "%s", s.creds.RefreshToken)
 
 	req, err := http.NewRequest(http.MethodPost, urlFor(refreshEP), body)
 	if err != nil {
@@ -556,22 +556,28 @@ func (s *Sectigo) newRequest(method, url string, data interface{}) (req *http.Re
 		return nil, ErrNotAuthenticated
 	}
 
-	// JSON serialize the data being sent to the request
-	var body io.Reader
 	if data != nil {
+		// JSON serialize the data being sent to the request
 		body := new(bytes.Buffer)
-		json.NewEncoder(body).Encode(data)
-	}
+		if err = json.NewEncoder(body).Encode(data); err != nil {
+			return nil, err
+		}
 
-	// Create the request
-	if req, err = http.NewRequest(method, url, body); err != nil {
-		return nil, err
+		if req, err = http.NewRequest(method, url, body); err != nil {
+			return nil, err
+		}
+	} else {
+		// Create a request with an empty body
+		if req, err = http.NewRequest(method, url, nil); err != nil {
+			return nil, err
+		}
 	}
 
 	// Set Headers
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.creds.AccessToken))
 	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("Accept", contentType)
+	req.Header.Set("User-Agent", userAgent)
 
 	return req, nil
 }
