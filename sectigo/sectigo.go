@@ -9,7 +9,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
+	"os"
+	"path/filepath"
 )
 
 // Sectigo provides authenticated http requests to the Sectigo IoT Manager 20.7 REST API.
@@ -77,6 +80,7 @@ func (s *Sectigo) Authenticate() (err error) {
 	if err != nil {
 		return err
 	}
+	defer rep.Body.Close()
 
 	// Handle error states
 	switch rep.StatusCode {
@@ -128,6 +132,7 @@ func (s *Sectigo) Refresh() (err error) {
 	if err != nil {
 		return err
 	}
+	defer rep.Body.Close()
 
 	// Handle error states
 	switch rep.StatusCode {
@@ -159,6 +164,167 @@ func (s *Sectigo) Refresh() (err error) {
 	return nil
 }
 
+// CreateSingleCertBatch issues a new single certificate batch.
+// User must be authenticated with role 'USER' and has permission to create request.
+// You may get http code 400 if supplied values in profileParams fails to validate over
+// rules specified in "profile".
+func (s *Sectigo) CreateSingleCertBatch(authority int, name string, params map[string]string) (batch *BatchResponse, err error) {
+	// perform preflight check for authenticated endpoint
+	if err = s.preflight(); err != nil {
+		return nil, err
+	}
+
+	batchInfo := &CreateSingleCertBatchRequest{
+		AuthorityID:   authority,
+		BatchName:     name,
+		ProfileParams: params,
+	}
+
+	// create request
+	var req *http.Request
+	if req, err = s.newRequest(http.MethodPut, urlFor(createSingleCertBatchEP), batchInfo); err != nil {
+		return nil, err
+	}
+
+	var rep *http.Response
+	if rep, err = s.client.Do(req); err != nil {
+		return nil, err
+	}
+	defer rep.Body.Close()
+
+	if err = s.checkStatus(rep); err != nil {
+		return nil, err
+	}
+
+	if err = json.NewDecoder(rep.Body).Decode(&batch); err != nil {
+		return nil, err
+	}
+	return batch, nil
+}
+
+// BatchDetail returns batch information by batch id.
+// User must be authenticated with role 'USER' and has permission to read this batch.
+func (s *Sectigo) BatchDetail(id int) (batch *BatchResponse, err error) {
+	// perform preflight check for authenticated endpoint
+	if err = s.preflight(); err != nil {
+		return nil, err
+	}
+
+	// create request
+	var req *http.Request
+	if req, err = s.newRequest(http.MethodGet, urlFor(batchDetailEP, id), nil); err != nil {
+		return nil, err
+	}
+
+	var rep *http.Response
+	if rep, err = s.client.Do(req); err != nil {
+		return nil, err
+	}
+	defer rep.Body.Close()
+
+	if err = s.checkStatus(rep); err != nil {
+		return nil, err
+	}
+
+	if err = json.NewDecoder(rep.Body).Decode(&batch); err != nil {
+		return nil, err
+	}
+	return batch, nil
+}
+
+// ProcessingInfo returns batch processing status by batch id.
+// User must be authenticated with role 'USER' and has permission to read this batch.
+func (s *Sectigo) ProcessingInfo(batch int) (status *ProcessingInfoResponse, err error) {
+	// perform preflight check for authenticated endpoint
+	if err = s.preflight(); err != nil {
+		return nil, err
+	}
+
+	// create request
+	var req *http.Request
+	if req, err = s.newRequest(http.MethodGet, urlFor(batchProcessingInfoEP, batch), nil); err != nil {
+		return nil, err
+	}
+
+	var rep *http.Response
+	if rep, err = s.client.Do(req); err != nil {
+		return nil, err
+	}
+	defer rep.Body.Close()
+
+	if err = s.checkStatus(rep); err != nil {
+		return nil, err
+	}
+
+	if err = json.NewDecoder(rep.Body).Decode(&status); err != nil {
+		return nil, err
+	}
+	return status, nil
+}
+
+// Download batch as a ZIP file.
+// Dir should be a directory, filename is detected from content-disposition.
+// User must be authenticated with role 'USER' and batch must be readable.
+func (s *Sectigo) Download(batch int, dir string) (path string, err error) {
+	// Verify download location
+	info, err := os.Stat(dir)
+	if os.IsNotExist(err) {
+		return "", fmt.Errorf("directory %q does not exist", dir)
+	}
+	if !info.IsDir() {
+		return "", fmt.Errorf("path %q is not a directory", dir)
+	}
+
+	// perform preflight check for authenticated endpoint
+	if err = s.preflight(); err != nil {
+		return "", err
+	}
+
+	// create request
+	var req *http.Request
+	if req, err = s.newRequest(http.MethodGet, urlFor(downloadEP, batch), nil); err != nil {
+		return "", err
+	}
+
+	// Set different content-type and accept headers
+	req.Header.Set("Content-Type", downloadContentType)
+	req.Header.Set("Accept", downloadContentType)
+
+	var rep *http.Response
+	if rep, err = s.client.Do(req); err != nil {
+		return "", err
+	}
+	defer rep.Body.Close()
+
+	// Parse the Content-Disposition header to get the download filename
+	var filename string
+	contentDisposition := rep.Header.Get("Content-Disposition")
+	if contentDisposition != "" {
+		_, params, err := mime.ParseMediaType(contentDisposition)
+		if err == nil {
+			filename = params["filename"]
+		}
+	}
+
+	if filename == "" {
+		filename = fmt.Sprintf("%d.zip", batch)
+	}
+	path = filepath.Join(dir, filename)
+
+	// Create the file to write the download into
+	// TODO: get the filename from the headers and treat path as a dir
+	var out *os.File
+	if out, err = os.Create(path); err != nil {
+		return "", err
+	}
+	defer out.Close()
+
+	if _, err = io.Copy(out, rep.Body); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
 // LicensesUsed returns statistic for Ordered/Issued certificates (licenses used)
 // User must be authenticated with role 'USER'
 func (s *Sectigo) LicensesUsed() (stats *LicensesUsedResponse, err error) {
@@ -177,6 +343,7 @@ func (s *Sectigo) LicensesUsed() (stats *LicensesUsedResponse, err error) {
 	if rep, err = s.client.Do(req); err != nil {
 		return nil, err
 	}
+	defer rep.Body.Close()
 
 	if err = s.checkStatus(rep); err != nil {
 		return nil, err
@@ -206,6 +373,7 @@ func (s *Sectigo) UserAuthorities() (authorities []*AuthorityResponse, err error
 	if rep, err = s.client.Do(req); err != nil {
 		return nil, err
 	}
+	defer rep.Body.Close()
 
 	if err = s.checkStatus(rep); err != nil {
 		return nil, err
@@ -235,6 +403,7 @@ func (s *Sectigo) Profiles() (profiles []*ProfileResponse, err error) {
 	if rep, err = s.client.Do(req); err != nil {
 		return nil, err
 	}
+	defer rep.Body.Close()
 
 	if err = s.checkStatus(rep); err != nil {
 		return nil, err
@@ -244,6 +413,66 @@ func (s *Sectigo) Profiles() (profiles []*ProfileResponse, err error) {
 		return nil, err
 	}
 	return profiles, nil
+}
+
+// ProfileParams lists the parameters acceptable and required by profileId
+// User must be authenticated with role 'ADMIN' or 'USER' and permission to read this profile
+func (s *Sectigo) ProfileParams(id int) (params []*ProfileParamsResponse, err error) {
+	// perform preflight check for authenticated endpoint
+	if err = s.preflight(); err != nil {
+		return nil, err
+	}
+
+	// create request
+	var req *http.Request
+	if req, err = s.newRequest(http.MethodGet, urlFor(profileParametersEP, id), nil); err != nil {
+		return nil, err
+	}
+
+	var rep *http.Response
+	if rep, err = s.client.Do(req); err != nil {
+		return nil, err
+	}
+	defer rep.Body.Close()
+
+	if err = s.checkStatus(rep); err != nil {
+		return nil, err
+	}
+
+	if err = json.NewDecoder(rep.Body).Decode(&params); err != nil {
+		return nil, err
+	}
+	return params, nil
+}
+
+// ProfileDetail gets extended profile information.
+// User must be authenticated with role 'ADMIN' or 'USER' and permission to read this profile.
+func (s *Sectigo) ProfileDetail(id int) (profile *ProfileDetailResponse, err error) {
+	// perform preflight check for authenticated endpoint
+	if err = s.preflight(); err != nil {
+		return nil, err
+	}
+
+	// create request
+	var req *http.Request
+	if req, err = s.newRequest(http.MethodGet, urlFor(profileDetailEP, id), nil); err != nil {
+		return nil, err
+	}
+
+	var rep *http.Response
+	if rep, err = s.client.Do(req); err != nil {
+		return nil, err
+	}
+	defer rep.Body.Close()
+
+	if err = s.checkStatus(rep); err != nil {
+		return nil, err
+	}
+
+	if err = json.NewDecoder(rep.Body).Decode(&profile); err != nil {
+		return nil, err
+	}
+	return profile, nil
 }
 
 // FindCertificate searches for certificates by common name and serial number.
@@ -268,6 +497,7 @@ func (s *Sectigo) FindCertificate(commonName, serialNumber string) (certs *FindC
 	if rep, err = s.client.Do(req); err != nil {
 		return nil, err
 	}
+	defer rep.Body.Close()
 
 	if err = s.checkStatus(rep); err != nil {
 		return nil, err
@@ -306,6 +536,7 @@ func (s *Sectigo) RevokeCertificate(profileID, reasonCode int, serialNumber stri
 	if rep, err = s.client.Do(req); err != nil {
 		return err
 	}
+	defer rep.Body.Close()
 
 	if err = s.checkStatus(rep); err != nil {
 		return err

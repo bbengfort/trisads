@@ -9,7 +9,10 @@ func init() {
 	buildEndpoints()
 }
 
-const contentType = "application/json;charset=UTF-8"
+const (
+	contentType         = "application/json;charset=UTF-8"
+	downloadContentType = "application/octet-stream"
+)
 
 // baseURL is used to construct API endpoints for Sectigo methods.
 // var baseURL = &url.URL{Scheme: "http", Host: "localhost:8812"}
@@ -36,7 +39,7 @@ var endpoints = map[string]*url.URL{
 	batchProcessingInfoEP:           {Path: "/api/v1/batches/%d/processing_info"},
 	batchDevicesAuditLogEP:          {Path: "/api/v1/batches/%d/devices/auditLog"},
 	batchPreviewEP:                  {Path: "/api/v1/batches/preview"},
-	createSingleCertBatchEP:         {Path: "/api/v1/createSingleCertBatch"},
+	createSingleCertBatchEP:         {Path: "/api/v1/batches/createSingleCertBatch"},
 	uploadEP:                        {Path: "/api/v1/upload"},
 	uploadCSVEP:                     {Path: "/api/v2/organizations/%d/profiles/%d/batches/csv-upload"},
 	generatorsEP:                    {Path: "/api/v1/generators"},
