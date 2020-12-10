@@ -32,14 +32,9 @@ func main() {
 			Action:   serve,
 			Flags: []cli.Flag{
 				cli.StringFlag{
-					Name:  "a, addr",
-					Usage: "the address and port to bind the server on",
-					Value: ":4433",
-				},
-				cli.StringFlag{
-					Name:   "d, db",
-					Usage:  "dsn to connect to trisa directory storage",
-					EnvVar: "TRISADS_DATABASE",
+					Name:   "a, addr",
+					Usage:  "the address and port to bind the server on",
+					EnvVar: "TRISADS_BIND_ADDR",
 				},
 			},
 		},
@@ -151,17 +146,21 @@ func main() {
 
 // Serve the TRISA directory service
 func serve(c *cli.Context) (err error) {
-	var dsn string
-	if dsn = c.String("db"); dsn == "" {
-		return cli.NewExitError("please specify a dsn to connect to the directory store", 1)
-	}
-
-	var srv *trisads.Server
-	if srv, err = trisads.New(dsn); err != nil {
+	var conf *trisads.Settings
+	if conf, err = trisads.Config(); err != nil {
 		return cli.NewExitError(err, 1)
 	}
 
-	if err = srv.Serve(c.String("addr")); err != nil {
+	if addr := c.String("addr"); addr != "" {
+		conf.BindAddr = addr
+	}
+
+	var srv *trisads.Server
+	if srv, err = trisads.New(conf); err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	if err = srv.Serve(); err != nil {
 		return cli.NewExitError(err, 1)
 	}
 	return nil

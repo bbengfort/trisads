@@ -8,30 +8,52 @@ import (
 	"os/signal"
 
 	"github.com/bbengfort/trisads/pb"
+	"github.com/bbengfort/trisads/sectigo"
 	"github.com/bbengfort/trisads/store"
+	"github.com/sendgrid/sendgrid-go"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
 // New creates a TRISA Directory Service with the specified configuration and prepares
 // it to listen for and serve GRPC requests.
-func New(dsn string) (s *Server, err error) {
-	s = &Server{}
-	if s.db, err = store.Open(dsn); err != nil {
+func New(conf *Settings) (s *Server, err error) {
+	// Load the default configuration from the environment
+	if conf == nil {
+		if conf, err = Config(); err != nil {
+			return nil, err
+		}
+	}
+
+	// Create the server and open the connection to the database
+	s = &Server{conf: conf}
+	if s.db, err = store.Open(conf.DatabaseDSN); err != nil {
 		return nil, err
 	}
 
+	// Create the Sectigo API client
+	if s.certs, err = sectigo.New(conf.SectigoUsername, conf.SectigoPassword); err != nil {
+		return nil, err
+	}
+
+	// Create the SendGrid API client
+	s.email = sendgrid.NewSendClient(conf.SendGridAPIKey)
+
+	// Configuration complete!
 	return s, nil
 }
 
 // Server implements the GRPC TRISADirectoryService.
 type Server struct {
-	db  store.Store
-	srv *grpc.Server
+	db    store.Store
+	srv   *grpc.Server
+	conf  *Settings
+	certs *sectigo.Sectigo
+	email *sendgrid.Client
 }
 
 // Serve GRPC requests on the specified address.
-func (s *Server) Serve(addr string) (err error) {
+func (s *Server) Serve() (err error) {
 	// Initialize the gRPC server
 	s.srv = grpc.NewServer()
 	pb.RegisterTRISADirectoryServer(s.srv, s)
@@ -46,13 +68,13 @@ func (s *Server) Serve(addr string) (err error) {
 
 	// Listen for TCP requests on the specified address and port
 	var sock net.Listener
-	if sock, err = net.Listen("tcp", addr); err != nil {
-		return fmt.Errorf("could not listen on %q", addr)
+	if sock, err = net.Listen("tcp", s.conf.BindAddr); err != nil {
+		return fmt.Errorf("could not listen on %q", s.conf.BindAddr)
 	}
 	defer sock.Close()
 
 	// Run the server
-	log.Infof("listening on %s", addr)
+	log.Infof("listening on %s", s.conf.BindAddr)
 	return s.srv.Serve(sock)
 }
 
@@ -85,6 +107,16 @@ func (s *Server) Register(ctx context.Context, in *pb.RegisterRequest) (out *pb.
 	}
 
 	// TODO: if verify is true: send verification request
+	if err = s.SendVerificationEmail(vasp); err != nil {
+		log.WithError(err).Warn("could not send verification email")
+		out.Error = &pb.Error{
+			Code:    500,
+			Message: err.Error(),
+		}
+	} else {
+		log.Info("verification email sent")
+	}
+
 	return out, nil
 }
 
