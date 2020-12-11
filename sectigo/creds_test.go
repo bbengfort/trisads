@@ -5,7 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/shibukawa/configdir"
 	"github.com/stretchr/testify/require"
 )
@@ -35,7 +37,11 @@ func TestCredentials(t *testing.T) {
 	require.Zero(t, creds.AccessToken)
 	require.Zero(t, creds.RefreshToken)
 
-	// Set the access and refresh tokens
+	// Set expired access and refresh tokens
+	require.Error(t, creds.Update(testAccessToken, testRefreshToken))
+	require.NoError(t, refreshTokens())
+
+	// Set valid access and refresh tokens
 	require.NoError(t, creds.Update(testAccessToken, testRefreshToken))
 	require.NotZero(t, creds.AccessToken)
 	require.NotZero(t, creds.RefreshToken)
@@ -44,6 +50,8 @@ func TestCredentials(t *testing.T) {
 	require.NotZero(t, creds.ExpiresAt)
 	require.NotZero(t, creds.NotBefore)
 	require.NotZero(t, creds.RefreshBy)
+	require.True(t, creds.Valid())
+	require.True(t, creds.Current())
 
 	// Load credentials from user supplied values and cached tokens
 	require.NoError(t, creds.Load("teller", "tigerpaw"))
@@ -53,9 +61,44 @@ func TestCredentials(t *testing.T) {
 }
 
 func checkCache() (err error) {
-	cdir := configdir.New("trisa", "sectigo").QueryCacheFolder()
-	if cdir.Exists("credentials.yaml") {
-		return fmt.Errorf("credentials already exists at %s", filepath.Join(cdir.Path, "credentials.yaml"))
+	cdir := configdir.New(vendorName, applicationName).QueryCacheFolder()
+	if cdir.Exists(credentialsCache) {
+		return fmt.Errorf("credentials already exists at %s", filepath.Join(cdir.Path, credentialsCache))
 	}
 	return nil
+}
+
+func refreshTokens() (err error) {
+	signKey := []byte("supersecret")
+	claims := apiClaims{
+		jwt.StandardClaims{
+			Subject:   "/account/42/user/42",
+			Issuer:    "https://iot.sectigo.com/",
+			IssuedAt:  time.Now().Unix(),
+			ExpiresAt: time.Now().Add(10 * time.Minute).Unix(),
+		},
+		[]string{"ROLE_USER"},
+		false,
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+	if testAccessToken, err = token.SignedString(signKey); err != nil {
+		return err
+	}
+
+	// Create refresh token
+	claims.Scopes = []string{"ROLE_REFRESH_TOKEN"}
+	claims.StandardClaims.Id = "5a7c98da-9f06-4a36-90b7-8bcaba091e13"
+	claims.StandardClaims.ExpiresAt = time.Now().Add(2 * time.Hour).Unix()
+	token = jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+	if testRefreshToken, err = token.SignedString(signKey); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type apiClaims struct {
+	jwt.StandardClaims
+	Scopes     []string `json:"scopes"`
+	FirstLogin bool     `json:"first-login"`
 }

@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: trisads
+  name: trisads
+  namespace: trisa
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trisads
+  template:
+    metadata:
+      labels:
+        app: trisads
+    spec:
+      containers:
+      - image: trisa/trisads
+        name: trisads
+        ports:
+        - containerPort: 4433
+          protocol: TCP
+          name: dsrpc
+        resources: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: envoy
+  name: envoy
+  namespace: trisa
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: envoy
+  template:
+    metadata:
+      labels:
+        app: envoy
+    spec:
+      containers:
+      - image: trisa/grpc-proxy
+        name: envoy
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+          name: proxy
+        resources: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: dsweb
+  name: dsweb
+  namespace: trisa
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dsweb
+  template:
+    metadata:
+      labels:
+        app: dsweb
+    spec:
+      containers:
+      - image: trisa/dsweb
+        name: dsweb
+        ports:
+        - containerPort: 80
+          protocol: TCP
+          name: http
+        resources: {}

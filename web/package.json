@@ -4,6 +4,7 @@
   "description": "Prototype web user interface for TRISA Directory Service",
   "main": "src/main.js",
   "dependencies": {
+    "envify": "^4.1.0",
     "jquery": "^3.5.1"
   },
   "devDependencies": {
@@ -24,7 +25,7 @@
   "scripts": {
     "serve": "./node_modules/.bin/concurrently \"./node_modules/.bin/watchify src/main.js --transform browserify-mustache -d -v -o build/bundle.js\" \"./node_modules/.bin/lite-server\"",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "./node_modules/.bin/browserify src/main.js --debug --transform browserify-mustache -t -p [ minifyify --map bundle.js.map --output build/bundle.map.js ] > build/bundle.js"
+    "build": "./node_modules/.bin/browserify src/main.js --debug --transform browserify-mustache -t envify -t -p [ minifyify --map bundle.js.map --output build/bundle.map.js ] > build/bundle.js"
   },
   "repository": {
     "type": "git",

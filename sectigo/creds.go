@@ -123,6 +123,7 @@ func (creds *Credentials) Update(accessToken, refreshToken string) (err error) {
 
 	creds.AccessToken = accessToken
 	creds.RefreshToken = refreshToken
+	creds.Subject = atc.Subject
 	creds.IssuedAt = time.Unix(atc.IssuedAt, 0)
 	creds.ExpiresAt = time.Unix(atc.ExpiresAt, 0)
 	creds.RefreshBy = time.Unix(rtc.ExpiresAt, 0)
@@ -208,6 +209,7 @@ func (creds *Credentials) Clear() {
 
 	creds.AccessToken = ""
 	creds.RefreshToken = ""
+	creds.Subject = ""
 	creds.IssuedAt = zeroTime
 	creds.ExpiresAt = zeroTime
 	creds.NotBefore = zeroTime

@@ -6,10 +6,54 @@ This is a prototype implementation of a gRPC directory service that can act as a
 
 ## Generate Protocol Buffers
 
-To regenerate the Go code from the protocol buffers:
+To regenerate the Go and Javascript code from the protocol buffers:
 
 ```
 $ go generate ./...
+```
+
+The go generate directives are stored in `pb/pb.go`. The directives create grpc Go in the `pb` package as well as grpc-web in the `web/src/pb` directory.
+
+## Quick Start
+
+The simplest way to get started is to use the `docker-compose.yml` file to get the following services running locally:
+
+- **trsisads**: the TRISA directory service that implements the grpc protocol
+- **proxy**: an envoy proxy that translates HTTP 1.1 requests into HTTP 2.0 requests
+- **dsui**: UI that implements grpc-web to connect to the directory server via the proxy
+
+Run the services as follows:
+
+```
+$ docker-compose up
+```
+
+Then connect to the UI on https://localhost:8000/
+
+### Development
+
+For development purposes you'll want to run and reload the servers individually. To run the directory service:
+
+```
+$ go run ./cmd/trisads serve
+```
+
+Note that you'll likely want to have the following environment variables configured:
+
+- `$SECTIGO_USERNAME`, `$SECTIGO_PASSWORD`: to access the Sectigo API
+- `$SENDGRID_API_KEY`: sending verification emails and certificates
+
+To run the development web UI server:
+
+```
+$ cd web
+$ npx serve
+```
+
+Finally, to run the proxy, use the docker image, building if necessary:
+
+```
+$ docker run -n grpc-proxy trisacrypto/proxy:develop
 ```
 
 ## Sectigo API

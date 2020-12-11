@@ -7,6 +7,7 @@ require (
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.4.2
 	github.com/kelseyhightower/envconfig v1.4.0
+	github.com/rs/zerolog v1.20.0
 	github.com/sendgrid/rest v2.6.2+incompatible
 	github.com/sendgrid/sendgrid-go v3.7.2+incompatible
 	github.com/shibukawa/configdir v0.0.0-20170330084843-e180dbdc8da0

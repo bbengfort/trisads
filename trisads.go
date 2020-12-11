@@ -10,10 +10,16 @@ import (
 	"github.com/bbengfort/trisads/pb"
 	"github.com/bbengfort/trisads/sectigo"
 	"github.com/bbengfort/trisads/store"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/sendgrid/sendgrid-go"
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
+
+func init() {
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+}
 
 // New creates a TRISA Directory Service with the specified configuration and prepares
 // it to listen for and serve GRPC requests.
@@ -24,6 +30,9 @@ func New(conf *Settings) (s *Server, err error) {
 			return nil, err
 		}
 	}
+
+	// Set the global level
+	zerolog.SetGlobalLevel(zerolog.Level(conf.LogLevel))
 
 	// Create the server and open the connection to the database
 	s = &Server{conf: conf}
@@ -74,16 +83,19 @@ func (s *Server) Serve() (err error) {
 	defer sock.Close()
 
 	// Run the server
-	log.Infof("listening on %s", s.conf.BindAddr)
+	log.Info().
+		Str("listen", s.conf.BindAddr).
+		Str("version", Version()).
+		Msg("server started")
 	return s.srv.Serve(sock)
 }
 
 // Shutdown the TRISA Directory Service gracefully
 func (s *Server) Shutdown() (err error) {
-	log.Info("gracefully shutting down")
+	log.Info().Msg("gracefully shutting down")
 	s.srv.GracefulStop()
 	if err = s.db.Close(); err != nil {
-		log.Error(err.Error())
+		log.Error().Err(err)
 		return err
 	}
 	return nil
@@ -97,24 +109,24 @@ func (s *Server) Register(ctx context.Context, in *pb.RegisterRequest) (out *pb.
 	vasp := pb.VASP{VaspEntity: in.Entity}
 
 	if out.Id, err = s.db.Create(vasp); err != nil {
-		log.WithError(err).Warn("could not register VASP")
+		log.Warn().Err(err).Msg("could not register VASP")
 		out.Error = &pb.Error{
 			Code:    400,
 			Message: err.Error(),
 		}
 	} else {
-		log.WithField("name", in.Entity.VaspFullLegalName).Info("registered VASP")
+		log.Info().Str("name", in.Entity.VaspFullLegalName).Msg("registered VASP")
 	}
 
 	// TODO: if verify is true: send verification request
 	if err = s.SendVerificationEmail(vasp); err != nil {
-		log.WithError(err).Warn("could not send verification email")
+		log.Error().Err(err).Msg("could not send verification email")
 		out.Error = &pb.Error{
 			Code:    500,
 			Message: err.Error(),
 		}
 	} else {
-		log.Info("verification email sent")
+		log.Info().Msg("verification email sent")
 	}
 
 	return out, nil
@@ -161,9 +173,9 @@ func (s *Server) Lookup(ctx context.Context, in *pb.LookupRequest) (out *pb.Look
 
 	if out.Error == nil {
 		out.Vasp = &vasp
-		log.WithField("id", vasp.Id).Info("VASP lookup succeeded")
+		log.Info().Uint64("id", vasp.Id).Msg("VASP lookup succeeded")
 	} else {
-		log.WithError(out.Error).Warn("could not lookup VASP")
+		log.Warn().Err(out.Error).Msg("could not lookup VASP")
 	}
 	return out, nil
 }
@@ -193,15 +205,16 @@ func (s *Server) Search(ctx context.Context, in *pb.SearchRequest) (out *pb.Sear
 		out.Vasps[i].VaspTRISACertification = nil
 	}
 
-	entry := log.WithFields(log.Fields{
-		"name":    in.Name,
-		"country": in.Country,
-		"results": len(out.Vasps),
-	})
+	entry := log.With().
+		Strs("name", in.Name).
+		Strs("country", in.Country).
+		Int("results", len(out.Vasps)).
+		Logger()
+
 	if out.Error != nil {
-		entry.WithError(out.Error).Warn("unsuccessful search")
+		entry.Warn().Err(out.Error).Msg("unsuccessful search")
 	} else {
-		entry.Info("search succeeded")
+		entry.Info().Msg("search succeeded")
 	}
 	return out, nil
 }

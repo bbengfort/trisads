@@ -39,10 +39,18 @@ const alert = (cls, err, msg) => {
   setTimeout(() => { $(".alert").alert("close"); }, 2000);
 }
 
+// TRISA Directory Client
+var client = null
+
 $(document).ready(function() {
   // Connect to the TRISA directory client and make queries.
-  // TODO: how to configure this URL from a Docker container?
-  var client = new proto.TRISADirectoryClient('http://127.0.0.1:8080');
+  if (process.env.TRISADS_API_ENDPOINT) {
+    client = new proto.TRISADirectoryClient(process.env.TRISADS_API_ENDPOINT);
+    console.log("accessing TRISA directory at " + process.env.TRISADS_API_ENDPOINT);
+  } else {
+    client = new proto.TRISADirectoryClient('http://127.0.0.1:8080');
+    console.log("accessing TRISA directory at http://127.0.0.1:8000");
+  }
 
   // Bind the search form to the search action
   $("#searchForm").submit((e) => {

@@ -6,6 +6,9 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 RUN npm install
 
+# Set production environment variable for build context
+ENV TRISADS_API_ENDPOINT="https://vaspdirectory.net:4434"
+
 # Build app with browserify
 COPY . .
 RUN npm run build

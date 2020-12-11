@@ -1,0 +1,25 @@
+apiVersion: skaffold/v2beta10
+kind: Config
+metadata:
+  name: trisads
+build:
+  artifacts:
+  - image: trisa/dsweb
+    context: web
+    docker:
+      dockerfile: Dockerfile
+  - image: trisa/grpc-proxy
+    context: proxy
+    docker:
+      dockerfile: Dockerfile
+  - image: trisa/trisads
+    docker:
+      dockerfile: Dockerfile
+  local:
+    push: true
+    useDockerCLI: true
+deploy:
+  kubectl:
+    defaultNamespace: trisa
+    manifests:
+    - manifests/*.yaml
