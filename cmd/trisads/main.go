@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -15,6 +16,11 @@ import (
 	"github.com/bbengfort/trisads/store"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+)
+
+var (
+	client pb.TRISADirectoryClient
 )
 
 func main() {
@@ -23,7 +29,18 @@ func main() {
 	app.Name = "trisads"
 	app.Version = trisads.Version()
 	app.Usage = "a gRPC based directory service for TRISA identity lookups"
-	app.Flags = []cli.Flag{}
+	app.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:   "e, endpoint",
+			Usage:  "the url to connect the directory service client",
+			Value:  "vaspdirectory.net:443",
+			EnvVar: "TRISA_DIRECTORY_URL",
+		},
+		cli.BoolFlag{
+			Name:  "S, no-secure",
+			Usage: "do not connect via TLS (e.g. for development)",
+		},
+	}
 	app.Commands = []cli.Command{
 		{
 			Name:     "serve",
@@ -55,14 +72,9 @@ func main() {
 		{
 			Name:     "verify",
 			Usage:    "mark a VASP entity as verified and create certificates",
-			Category: "server",
+			Category: "admin",
 			Action:   verify,
 			Flags: []cli.Flag{
-				cli.StringFlag{
-					Name:   "d, db",
-					Usage:  "dsn to connect to trisa directory storage",
-					EnvVar: "TRISADS_DATABASE",
-				},
 				cli.BoolFlag{
 					Name:  "l, list",
 					Usage: "list VASPs that require verification and exit",
@@ -78,13 +90,8 @@ func main() {
 			Usage:    "register a VASP using json data",
 			Category: "client",
 			Action:   register,
+			Before:   initClient,
 			Flags: []cli.Flag{
-				cli.StringFlag{
-					Name:   "a, addr",
-					Usage:  "the address and port to connect to the directory service",
-					Value:  "localhost:4433",
-					EnvVar: "TRISA_DIRECTORY_URL",
-				},
 				cli.StringFlag{
 					Name:  "d, data",
 					Usage: "the json file containing the VASP data record",
@@ -100,13 +107,9 @@ func main() {
 			Usage:    "lookup VASPs using name or ID",
 			Category: "client",
 			Action:   lookup,
+			Before:   initClient,
 			Flags: []cli.Flag{
-				cli.StringFlag{
-					Name:   "a, addr",
-					Usage:  "the address and port to connect to the directory service",
-					Value:  "localhost:4433",
-					EnvVar: "TRISA_DIRECTORY_URL",
-				},
+
 				cli.StringFlag{
 					Name:  "n, name",
 					Usage: "name of the VASP to lookup (case-insensitive, exact match)",
@@ -122,13 +125,8 @@ func main() {
 			Usage:    "search for VASPs using name or country",
 			Category: "client",
 			Action:   search,
+			Before:   initClient,
 			Flags: []cli.Flag{
-				cli.StringFlag{
-					Name:   "a, addr",
-					Usage:  "the address and port to connect to the directory service",
-					Value:  "localhost:4433",
-					EnvVar: "TRISA_DIRECTORY_URL",
-				},
 				cli.StringSliceFlag{
 					Name:  "n, name",
 					Usage: "one or more names of the VASPs to search for",
@@ -265,11 +263,6 @@ func register(c *cli.Context) (err error) {
 		return cli.NewExitError(err, 1)
 	}
 
-	client, err := makeClient(c)
-	if err != nil {
-		return cli.NewExitError(err, 1)
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -292,11 +285,6 @@ func lookup(c *cli.Context) (err error) {
 
 	if name != "" && id > 0 {
 		return cli.NewExitError("specify either name or id for lookup, not both", 1)
-	}
-
-	client, err := makeClient(c)
-	if err != nil {
-		return cli.NewExitError(err, 1)
 	}
 
 	req := &pb.LookupRequest{
@@ -326,11 +314,6 @@ func search(c *cli.Context) (err error) {
 		return cli.NewExitError("specify search query", 1)
 	}
 
-	client, err := makeClient(c)
-	if err != nil {
-		return cli.NewExitError(err, 1)
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -343,15 +326,21 @@ func search(c *cli.Context) (err error) {
 }
 
 // helper function to create the GRPC client with default options
-func makeClient(c *cli.Context) (_ pb.TRISADirectoryClient, err error) {
+func initClient(c *cli.Context) (err error) {
 	var opts []grpc.DialOption
-	opts = append(opts, grpc.WithInsecure())
+	if c.GlobalBool("no-secure") {
+		opts = append(opts, grpc.WithInsecure())
+	} else {
+		config := &tls.Config{}
+		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(config)))
+	}
 
 	var cc *grpc.ClientConn
-	if cc, err = grpc.Dial(c.String("addr"), opts...); err != nil {
-		return nil, err
+	if cc, err = grpc.Dial(c.GlobalString("endpoint"), opts...); err != nil {
+		return cli.NewExitError(err, 1)
 	}
-	return pb.NewTRISADirectoryClient(cc), nil
+	client = pb.NewTRISADirectoryClient(cc)
+	return nil
 }
 
 // helper function to print JSON response and exit
